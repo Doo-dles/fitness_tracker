@@ -1,13 +1,12 @@
 # **Personal Fitness Tracker**  
 
-**Track your fitness progress with ease!** This **AI-powered fitness tracker** helps you log your daily exercise, monitor key health metrics, and get **calorie burn predictions** based on your activity.  
+**Track your fitness progress with ease!** This **Personal fitness tracker** helps you log your daily exercise, monitor key health metrics, and get **calorie burn predictions** based on your activity.  
 
 ## **Features**  
 ✅ **User Authentication** (Register/Login)  
 ✅ **Log Exercise Data** (Duration, Heart Rate, Steps, Body Temp)  
 ✅ **Calorie Burn Prediction** (AI-based estimation)  
-✅ **Progress Tracking** (Graphical visualization of past workouts)  
-✅ **Personalized Fitness Plan** (Custom recommendations)  
+✅ **Progress Tracking** (Graphical visualization of past workouts)
 
 ---
 
