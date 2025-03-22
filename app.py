@@ -9,18 +9,16 @@ import datetime
 
 st.set_page_config(
     page_title="Personal Fitness Tracker",
-    page_icon="assets/logo.png"  # Just pass the filename (it should be in the same folder)
+    page_icon="assets/logo.png"
 )
 
 
-# Load trained model and scaler
 with open("models/calorie_predictor.pkl", "rb") as model_file:
     model = pickle.load(model_file)
 
 with open("models/scaler.pkl", "rb") as scaler_file:
     scaler = pickle.load(scaler_file)
 
-# Initialize Database
 def init_db():
     conn = sqlite3.connect("fitness_tracker.db")
     c = conn.cursor()
@@ -35,6 +33,7 @@ def init_db():
                     age INTEGER,
                     height INTEGER,
                     weight INTEGER,
+                    bmi FLOAT,
                     FOREIGN KEY (username) REFERENCES users(username))''')
     c.execute('''CREATE TABLE IF NOT EXISTS progress (
                     id INTEGER PRIMARY KEY, 
@@ -49,7 +48,6 @@ def init_db():
     conn.commit()
     conn.close()
 
-# Hashing password
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
@@ -78,20 +76,22 @@ def login_user(username, password):
     return user
 
 # Save user details
-def save_personal_details(username, gender, age, height, weight):
+def save_personal_details(username, gender, age, height, weight, bmi):
     conn = sqlite3.connect("fitness_tracker.db")
     c = conn.cursor()
     c.execute('''INSERT INTO user_details 
-                 (username, gender, age, height, weight) 
-                 VALUES (?, ?, ?, ?, ?) 
+                 (username, gender, age, height, weight, bmi) 
+                 VALUES (?, ?, ?, ?, ?, ?) 
                  ON CONFLICT(username) DO UPDATE 
                  SET gender=excluded.gender, 
                      age=excluded.age, 
                      height=excluded.height, 
-                     weight=excluded.weight''',
-              (username, gender, age, height, weight))
+                     weight=excluded.weight,
+                     bmi=excluded.bmi''',
+              (username, gender, age, height, weight, bmi))
     conn.commit()
     conn.close()
+
 
 # Get user details
 def get_personal_details(username):
@@ -131,8 +131,6 @@ def save_progress(username, duration, heart_rate, body_temp, steps_taken):
     
     return calories_burned
 
-
-# Get Progress Data
 def get_progress(username):
     conn = sqlite3.connect("fitness_tracker.db")
     c = conn.cursor()
@@ -145,9 +143,8 @@ def get_progress(username):
 init_db()
 
 def calculate_calories_burned(weight, duration, steps, heart_rate):
-    # MET (Metabolic Equivalent of Task) formula
     met = (heart_rate / 100) + (steps / 10000)
-    calories_burned = (met * weight * duration) / 60  # Convert to per-minute basis
+    calories_burned = (met * weight * duration) / 60
     return round(calories_burned, 2)
 
 
@@ -207,41 +204,74 @@ elif st.session_state.page == "home":
     details = get_personal_details(st.session_state.username)
 
     if details:
+        gender = details[0]
+        age = details[1]
+        height = details[2]
+        weight = details[3]
+        bmi = details[4] if len(details) > 4 and details[4] is not None else "N/A"  # ✅ Prevent IndexError
+
         st.markdown(
-    f"""
-    <style>
-        .details-box {{
-            border: 2px solid #ffffff; /* Green border */
-            padding: 15px;
-            border-radius: 10px;
-            background: linear-gradient(135deg, #222, #333); /* Dark gradient */
-            color: #fff;
-            width: 100%; /* Full width */
-            text-align: center; /* Center text */
-            box-shadow: 2px 4px 10px rgba(0, 0, 0, 0.3); /* Soft shadow */
-        }}
-        .details-box p {{
-            font-size: 18px; /* Bigger text */
-            margin: 8px 0; /* Space between lines */
-            font-weight: bold;
-        }}
-    </style>
-    
-    <div class='details-box'>
-        <p> <strong>Gender:</strong> {details[0]}</p>
-        <p> <strong>Age:</strong> {details[1]} years</p>
-        <p> <strong>Height:</strong> {details[2]} cm</p>
-        <p> <strong>Weight:</strong> {details[3]} kg</p>
-    </div>
-    <br> <!-- Adds space below -->
-    """, 
-    unsafe_allow_html=True
-)
+            f"""
+            <style>
+                .details-table {{
+                    width: 100%;
+                    border-collapse: collapse;
+                    background: linear-gradient(135deg, #222, #333);
+                    color: #fff;
+                    border-radius: 10px;
+                    overflow: hidden;
+                    box-shadow: 2px 4px 10px rgba(0, 0, 0, 0.3);
+                }}
+                .details-table th, .details-table td {{
+                    padding: 12px;
+                    text-align: left;
+                    border-bottom: 1px solid #444;
+                }}
+                .details-table th {{
+                    background: #444;
+                    font-size: 18px;
+                    text-align: center;
+                }}
+                .details-table td {{
+                    font-size: 16px;
+                    font-weight: bold;
+                    text-align: center;
+                }}
+                .details-table tr:last-child td {{
+                    border-bottom: none;
+                }}
+            </style>
+
+            <table class='details-table'>
+                <tr>
+                    <td>Gender</td>
+                    <td>{gender}</td>
+                </tr>
+                <tr>
+                    <td>Age</td>
+                    <td>{age} years</td>
+                </tr>
+                <tr>
+                    <td>Height</td>
+                    <td>{height} cm</td>
+                </tr>
+                <tr>
+                    <td>Weight</td>
+                    <td>{weight} kg</td>
+                </tr>
+                <tr>
+                    <td>BMI</td>
+                    <td>{bmi}</td> 
+                </tr>
+            </table>
+            <br>
+            """, 
+            unsafe_allow_html=True
+        )
 
     if "edit_mode" not in st.session_state:
         st.session_state.edit_mode = False
 
-    # 🔹 Show input fields if no details exist (for first-time users)
     if not details or st.session_state.edit_mode:
         st.subheader("Add / Edit Your Details")
 
@@ -250,10 +280,11 @@ elif st.session_state.page == "home":
             age = st.number_input("Age", min_value=10, max_value=100, step=1, value=details[1] if details else 20)
             height = st.number_input("Height (cm)", min_value=100, max_value=250, step=1, value=details[2] if details else 170)
             weight = st.number_input("Weight (kg)", min_value=30, max_value=200, step=1, value=details[3] if details else 60)
+            bmi = st.number_input("BMI", min_value=5.0, max_value=50.0, step=0.1, format="%.1f")
 
             save_changes = st.form_submit_button("Save Changes")
             if save_changes:
-                save_personal_details(st.session_state.username, gender, age, height, weight)
+                save_personal_details(st.session_state.username, gender, age, height, weight, bmi)
                 st.success("Details saved successfully!")
                 st.session_state.edit_mode = False
                 st.rerun()
@@ -271,16 +302,13 @@ elif st.session_state.page == "home":
 elif st.session_state.page == "progress":
     st.title(" Progress Overview")
 
-    # Fetch progress data
     data = get_progress(st.session_state.username)
 
     if data:
         st.write("## Recent Progress")
 
-        # Convert to DataFrame
         df = pd.DataFrame(data, columns=["Date", "Calories Burned"])
 
-        # Convert date column to datetime
         df["Date"] = pd.to_datetime(df["Date"])
         df = df.sort_values("Date")
 
@@ -291,7 +319,6 @@ elif st.session_state.page == "progress":
 
     st.subheader("Log Your Progress")
 
-    # Fetch user details
     user_details = get_personal_details(st.session_state.username)
 
     if user_details:
@@ -300,7 +327,6 @@ elif st.session_state.page == "progress":
         st.error("Please add your personal details first on the Home page.")
         st.stop()
 
-    # Progress input fields
     with st.form("progress_form"):
         duration = st.number_input(" Exercise (minutes)", min_value=1, max_value=300, step=1)
         heart_rate = st.number_input(" Heart Rate (bpm)", min_value=40, max_value=200, step=1)
@@ -310,16 +336,13 @@ elif st.session_state.page == "progress":
         submit_progress = st.form_submit_button("Save Progress")
 
         if submit_progress:
-            # Calculate Calories Burned
             calories_burned = calculate_calories_burned(weight, duration, steps_taken, heart_rate)
 
-            # Save to database
             save_progress(st.session_state.username, duration, heart_rate, body_temp, steps_taken)
 
             st.success(" Progress saved successfully!")
             st.rerun()
 
-    # 📈 Graph at the Bottom
     if data:
         st.write("### Calories Burned Over Time")
         st.line_chart(df.set_index("Date")["Calories Burned"])
